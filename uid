@@ -1,1 +1,703 @@
-229262, 229263
+RemoveCallbacks()
+
+    local telephonex = 0
+    local telephoney = 0
+    local blocksdb = true
+    local bdl = false
+    local bdl1 = false
+    local wrenchmode = ""
+    local wrenchname = ""
+    local fastwrench = false
+    local lastjoinedworld = "EXIT"
+    local dialog = true
+
+    function OnTextOverlay(text)
+        var = {}
+        var[0] = "OnTextOverlay"
+        var[1] = text
+        var.netid = -1
+        SendVarlist(var)
+    end
+
+    function OnConsoleMessage(text)
+        var = {}
+        var[0] = "OnConsoleMessage"
+        var[1] = text
+        var.netid = -1
+        SendVarlist(var)
+    end
+
+    function use(id, x, y)
+        local pkt = {}
+        pkt.type = 3
+        pkt.int_data = id
+        pkt.pos_x = GetLocal().pos_x
+        pkt.pos_y = GetLocal().pos_y
+        pkt.int_x = x
+        pkt.int_y = y
+        pkt.flags = 2560
+        SendPacketRaw(pkt)
+    end
+
+    function log(text)
+        local packet = {}
+        packet[0] = "OnConsoleMessage"
+        packet[1] = "`0[`^MEGP Proxy`0]`o " .. text
+        packet.netid = -1
+        SendVarlist(packet)
+    end
+
+    function warp(world)
+        SendPacket(3, "action|join_request\nname|" .. world .. "\ninvitedWorld|0")
+    end
+
+    function split(pString, pPattern)
+        local Table = {} -- NOTE: use {n = 0} in Lua-5.0
+        local fpat = "(.-)" .. pPattern
+        local last_end = 1
+        local s, e, cap = pString:find(fpat, 1)
+        while s do
+            if s ~= 1 or cap ~= "" then
+                table.insert(Table, cap)
+            end
+            last_end = e + 1
+            s, e, cap = pString:find(fpat, last_end)
+        end
+        if last_end <= #pString then
+            cap = pString:sub(last_end)
+            table.insert(Table, cap)
+        end
+        return Table
+    end
+
+    function start_stop_check_gems(type, packet)
+        if [[
+action|input
+|text|/gems]] == packet then
+            gems_checker = not gems_checker
+            log("`9Gems checker is " .. (gems_checker and "`2ON" or "`4OFF"))
+            OnTextOverlay("`9Gems checker is " .. (gems_checker and "`2ON" or "`4OFF"))
+            RunThread(trackGems)
+            return true
+        end
+    end
+
+    AddCallback("start_stop_check_gems", "OnPacket", start_stop_check_gems)
+
+    function trackGems()
+        while gems_checker do
+            local gems = GetLocal().gems
+
+            Sleep(1200)
+            if gems ~= GetLocal().gems then
+                Sleep(1200)
+                local message = string.format("Collected`2 +%d (gems)", GetLocal().gems - gems)
+                OnTextOverlay(message)
+                SendPacket(2, string.format("action|input\ntext|%s", message))
+            end
+        end
+    end
+
+    function buydl()
+        while bdl do
+            if GetLocal().gems > 100000 then
+                SendPacket(2,
+                    "action|dialog_return\ndialog_name|telephone\nnum|53785|\nx|" ..
+                    telephonex .. "|\ny|" .. telephoney .. "|\nbuttonClicked|dlconvert")
+                Sleep(100)
+            end
+        end
+    end
+
+    function buydl1()
+        SendPacket(2,
+            "action|dialog_return\ndialog_name|telephone\nnum|53785|\nx|" ..
+            telephonex .. "|\ny|" .. telephoney .. "|\nbuttonClicked|dlconvert")
+        Sleep(100)
+    end
+
+    function string.removeColors(varlist)
+        return varlist:gsub("`.", "")
+    end
+
+    function qq_function(num)
+        return num % 10
+    end
+
+    function reme_function(num)
+        local sum = 0
+        while num > 0 do
+            sum = sum + num % 10
+            num = math.floor(num / 10)
+        end
+        return sum
+    end
+
+    function Spin_checker(varlist)
+        if "OnTalkBubble" == varlist[0] and -1 ~= varlist[3] and varlist[2]:find("spun the wheel and got") then
+            text = ""
+            if varlist[2]:find("CP:") then
+                start, final = string.find(varlist[2], "=")
+                text = "`0[ `4FAKE `0] " .. string.sub(varlist[2], final + 1)
+            else
+                x = varlist[2]:removeColors()
+                x2 = x:match("spun the wheel and got (%d+)")
+                x2 = tonumber(x2)
+                qq_mode = qq_function(x2)
+                reme_mode2 = reme_function(x2)
+                reme_mode = qq_function(reme_mode2)
+                var = {}
+                var[0] = "OnTalkBubble"
+                var[1] = varlist[1]
+                var[2] = "`0[`2REAL`0] CSN : `r" ..
+                    x2 .. " `0 [QEME] : `r" .. qq_mode .. " `0 [REME] : `r" ..
+                    reme_mode
+                var[3] = -1
+                var.netid = -1
+                SendVarlist(var)
+
+                return true
+            end
+            SendVarlist({
+                [0] = "OnTalkBubble",
+                [1] = varlist[1],
+                [2] = text,
+                [3] = -1,
+                netid = -1
+            })
+            return true
+        end
+    end
+
+    AddCallback("Spin_checker", "OnVarlist", Spin_checker)
+
+    function shatter(id)
+        local packet = {}
+        packet.type = 10
+        packet.int_data = id
+        SendPacketRaw(packet)
+    end
+
+    function drop(itemID, count)
+        SendPacket(2, "action|dialog_return\ndialog_name|drop\nitem_drop|" .. itemID .. "|\nitem_count|" .. count .. "")
+    end
+
+    function pullnetid(netid)
+        SendPacket(2,
+            "action|dialog_return\ndialog_name|popup\nnetID|" .. netid .. "|\nnetID|" .. netid .. "|\nbuttonClicked|pull")
+        return true
+    end
+
+    function netidfromname(username)
+        for _, item in pairs(GetPlayers()) do
+            if string.sub(item.name, 3, string.len(item.name) - 2) == username then
+                return math.floor(item.netid)
+            end
+        end
+        return GetLocal().netid
+    end
+
+    function namefromnetid(netid)
+        for _, item in pairs(GetPlayers()) do
+            if item.netid == netid then
+                return item.name
+            end
+        end
+        return GetLocal().netid
+    end
+
+    function cdrop(count)
+        shouldCancel = true
+        tonumber(count)
+        local wl = count % 100
+        local dl = math.floor(count / 100) % 100
+        local bgl = math.floor(count / 10000)
+
+        local dlinventory = 0
+        local wlinventory = 0
+        local bglinventory = 0
+
+        for _, item in pairs(GetInventory()) do
+            if (item.id == 242) then
+                wlinventory = item.count
+            end
+            if (item.id == 1796) then
+                dlinventory = item.count
+            end
+            if (item.id == 7188) then
+                bglinventory = item.count
+            end
+        end
+
+        --drop
+        if bgl ~= 0 then
+            if bglinventory < bgl then
+                drop(1796, 100 * bgl)
+            else
+                drop(7188, bgl)
+            end
+            OnTextOverlay("`9Dropped `2" .. tostring(math.floor(bgl)) .. " `9Blue Gem Locks")
+            log("`9Dropped `2" .. tostring(math.floor(bgl)) .. " `9Blue Gem Locks")
+            Sleep(75)
+        end
+        if dl ~= 0 then
+            if dlinventory < dl and bglinventory > bgl then
+                shatter(7188)
+            end
+            if dlinventory < dl and wlinventory > wl + dl * 100 then
+                shatter(242)
+            end
+            drop(1796, dl)
+            OnTextOverlay("`9Dropped `2" .. tostring(math.floor(dl)) .. " `9Diamond Locks")
+            log("`9Dropped `2" .. tostring(math.floor(dl)) .. " `9Diamond Locks")
+            Sleep(75)
+        end
+        if wl ~= 0 then
+            if wlinventory < wl and dlinventory > dl then
+                shatter(1796)
+            end
+            drop(242, wl)
+            OnTextOverlay("`9Dropped `2" .. tostring(math.floor(wl)) .. " `9World Locks")
+            log("`9Dropped `2" .. tostring(math.floor(wl)) .. " `9World Locks")
+            Sleep(75)
+        end
+        Sleep(300)
+        shouldCancel = false
+    end
+
+    function wrench()
+        addLabelWithIcon("`9Wrench Mode", "32", "small")
+        addSpacer("small")
+        textsc("aaaaaaaa")
+        addSpacer("small")
+        if wrenchmode == "pull" or wrenchmode == "kick" or wrenchmode == "ban" or wrenchmode == "pvp" then
+            addSmallText("`cPlease `6Choose One")
+            addSmallText("" .. wrenchname .. " `2Enabled")
+        end
+        if wrenchmode == "" then
+            addSmallText("`cPlease `6Choose One")
+        end
+        if wrenchmode == "ban" then
+            addbuttonwhiticon("wmban", "`4Ban", "staticGreenFrame", "732")
+        else
+            addbuttonwhiticon("wmban", "`4Ban", "staticYellowFrame", "732")
+        end
+        if wrenchmode == "kick" then
+            addbuttonwhiticon("wmkick", "`4Kick", "staticGreenFrame", "278")
+        else
+            addbuttonwhiticon("wmkick", "`4Kick", "staticYellowFrame", "278")
+        end
+        if wrenchmode == "pull" then
+            addbuttonwhiticon("wmpull", "`pPull", "staticGreenFrame", "274")
+        else
+            addbuttonwhiticon("wmpull", "`pPull", "staticYellowFrame", "274")
+        end
+        if wrenchmode == "pvp" then
+            addbuttonwhiticon("wmpvp", "`6PvP", "staticGreenFrame", "618")
+        else
+            addbuttonwhiticon("wmpvp", "`6PvP", "staticYellowFrame", "618")
+        end
+        if wrenchmode == "" and fastwrench then
+            fastwrench = false
+            log("`9Fast Wrench `4OFF")
+            OnTextOverlay("`9Fast Wrench `4OFF")
+        end
+        endlist()
+        addSpacer("small")
+        addSmallText("`c Do `6/wm to `2Enabled `cor `4Disable")
+        addQuickExit()
+        addEndDialog("wrench", "`wOkay")
+        finishDialog()
+    end
+
+    AddCallback("commandsss", "OnPacket", function(type, packet)
+        if (type == 2 and packet:find("/proxy")) then
+            proxy()
+            return true
+        end
+        if (type == 2 and packet:find("/cd ") or type == 2 and packet:find("/cdrop ")) then
+            RunThread(function()
+                local args = split(packet, " ")
+                cdrop(args[2])
+            end)
+            return true
+        end
+
+        if (type == 2 and packet:find("/dd ") or type == 2 and packet:find("/ddrop ")) then
+            RunThread(function()
+                local args = split(packet, " ")
+                cdrop(args[2] * 100)
+            end)
+            return true
+        end
+
+        if (type == 2 and packet:find("/bd ") or type == 2 and packet:find("/bdrop ")) then
+            RunThread(function()
+                local args = split(packet, " ")
+                cdrop(args[2] * 10000)
+            end)
+            return true
+        end
+
+        if (type == 2 and packet:find("/res")) then
+            log("`9Respawning")
+            OnTextOverlay("`9Respawning")
+            SendPacket(2, "action|respawn")
+            return true
+        end
+        if (type == 2 and packet:find("/cbgl")) then
+            RunThread(function()
+                for _, item in pairs(GetInventory()) do
+                    if item.id == 1796 then
+                        if item.count < 100 then
+                            OnTextOverlay("`9No enough Dls.")
+                            return true
+                        elseif telephonex == 0 and telephoney == 0 then
+                            OnTextOverlay("`9Set Telephone Pos First")
+                        else
+                            OnTextOverlay("`9Change BGL `9Bgl")
+                            SendPacket(2,
+                                "action|dialog_return\ndialog_name|telephone\nnum|53785|\nx|" ..
+                                telephonex .. "|\ny|" .. telephoney .. "|\nbuttonClicked|bglconvert")
+                            return true
+                        end
+                    end
+                end
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/setphone")) then
+            telephonex = GetLocal().pos_x // 32
+            telephoney = GetLocal().pos_y // 32
+            log("`9Phone Position Set To X: `2" .. telephonex .. " `9Y: `2" .. telephoney)
+            OnTextOverlay("`9Phone Position Set To X: `2" .. telephonex .. " `9Y: `2" .. telephoney)
+            return true
+        end
+        if (type == 2 and packet:find("/bsdb")) then
+            RunThread(function()
+                if blocksdb then
+                    blocksdb = false
+                    log("`9Block SDB `4OFF")
+                    OnTextOverlay("`9Block SDB `4OFF")
+                else
+                    blocksdb = true
+                    log("`9Block SDB `2ON")
+                    OnTextOverlay("`9Block SDB `2ON")
+                end
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/buydlall")) then
+            RunThread(function()
+                if bdl then
+                    bdl = false
+                    buydl()
+                    log("`9Buy DL `4OFF")
+                    OnTextOverlay("`9Buy All DL `4OFF")
+                elseif telephonex == 0 and telephoney == 0 then
+                    OnTextOverlay("`9Set Phone First")
+                elseif GetLocal().gems < 100000 then
+                    bdl = false
+                    OnTextOverlay("Not Enough Gems")
+                else
+                    bdl = true
+                    log("`9Buy DL `2ON")
+                    OnTextOverlay("`9Buy All DL `2ON")
+                    buydl()
+                end
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/buydl")) then
+            RunThread(function()
+                if bdl1 then
+                    bdl1 = false
+                    buydl1()
+                elseif telephonex == 0 and telephoney == 0 then
+                    OnTextOverlay("`9Set Phone First")
+                elseif GetLocal().gems < 100000 then
+                    bdl1 = false
+                    OnTextOverlay("Not Enough Gems")
+                else
+                    bdl1 = true
+                    log("`9Buy 1 DL")
+                    OnTextOverlay("`9Buy 1 DL")
+                    buydl1()
+                end
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/bdialog")) then
+            RunThread(function()
+                if dialog then
+                    dialog = false
+                    log("`9Block All Dialog `4OFF")
+                    OnTextOverlay("`9Block All Dialog `4OFF")
+                else
+                    dialog = true
+                    log("`9Block All Dialog `2ON")
+                    OnTextOverlay("`9Block All Dialog `2ON")
+                end
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/dbgems")) then
+            RunThread(function()
+                SendPacket(2, "action|dialog_return\ndialog_name|social\nbuttonClicked|bgem_dropall")
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/suck")) then
+            RunThread(function()
+                SendPacket(2, "action|dialog_return\ndialog_name|social\nbuttonClicked|bgem_suckall")
+            end)
+            return true
+        end
+        if (packet:find("action|wrench")) then
+            netid2 = tonumber(string.sub(packet, 22, 30))
+            name = namefromnetid(netid2)
+            if fastwrench and netid2 ~= GetLocal().netid then
+                if (wrenchmode:find("pull")) then
+                    SendPacket(2,
+                        "action|dialog_return\ndialog_name|popup\nnetID|" ..
+                        netid2 .. "|\nnetID|" .. netid2 .. "|\nbuttonClicked|pull")
+                    OnTextOverlay("`wSuccesfully `pPull `0" .. name)
+                elseif (wrenchmode:find("kick")) then
+                    SendPacket(2,
+                        "action|dialog_return\ndialog_name|popup\nnetID|" ..
+                        netid2 .. "|\nnetID|" .. netid2 .. "|\nbuttonClicked|kick")
+                    OnTextOverlay("`wSuccesfully `4Kick `0" .. name)
+                elseif (wrenchmode:find("ban")) then
+                    SendPacket(2,
+                        "action|dialog_return\ndialog_name|popup\nnetID|" ..
+                        netid2 .. "|\nnetID|" .. netid2 .. "|\nbuttonClicked|world_ban")
+                    OnTextOverlay("`wSuccesfully `4Ban `0" .. name)
+                elseif (wrenchmode:find("pvp")) then
+                    SendPacket(2, "action|dialog_return\ndialog_name|pvp_settings\nnetID|" .. netid2 .. "|\nbet|50")
+                    OnTextOverlay("`wRequested `6PVP `0" .. name)
+                end
+                return true
+            end
+        end
+
+        -- FAST WRENCH MENU
+        if (packet:find("togglefastwrench|1")) then
+            fastwrench = true
+            log("`9Fast Wrench `2ON")
+        end
+        if (packet:find("togglefastwrench|0")) then
+            fastwrench = false
+            log("`9Fast Wrench `4OFF")
+        end
+        if (packet:find("buttonClicked|wmpull")) then
+            wrenchmode = "pull"
+            wrenchname = "`pPull"
+            wrench()
+        end
+        if (packet:find("buttonClicked|wmkick")) then
+            wrenchmode = "kick"
+            wrenchname = "`4Kick"
+            wrench()
+        end
+        if (packet:find("buttonClicked|wmban")) then
+            wrenchmode = "ban"
+            wrenchname = "`4Ban"
+            wrench()
+        end
+        if (packet:find("buttonClicked|wmpvp")) then
+            wrenchmode = "pvp"
+            wrenchname = "`6PVP"
+            wrench()
+        end
+        if (packet:find("buttonClicked|wmoff")) then
+            wrenchmode = ""
+            wrenchname = ""
+            wrench()
+        end
+        if (type == 2 and packet:find("/wm")) then
+            RunThread(function()
+                if wrenchmode == "" then
+                    wrench()
+                    log("`9Set Wrench Mode First")
+                    OnTextOverlay("`9Set Wrench Mode First")
+                    return
+                end
+                if fastwrench then
+                    fastwrench = false
+                    log("`9Fast Wrench `4OFF")
+                    OnTextOverlay("`9Fast Wrench `4OFF")
+                else
+                    fastwrench = true
+                    log("`9Fast Wrench `2ON")
+                    OnTextOverlay("`9Fast Wrench `2ON")
+                end
+            end)
+            return true
+        end
+
+        if (type == 2 and packet:find("/wrench")) then
+            RunThread(function()
+                wrench()
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/ping")) then
+            if GetPing() > 150 then
+                color = "`9"
+            end
+            if GetPing() > 400 then
+                color = "`4"
+            end
+            if GetPing() < 150 then
+                color = "`2"
+            end
+            OnTextOverlay("`9Your ping : " .. color .. tostring(GetPing()):gsub(".0", ""))
+            return true
+        end
+        if (type == 2 and packet:find("/relog")) then
+            curworld = GetLocal().world
+            RunThread(function()
+                warp("EXIT")
+                OnTextOverlay("EXIT")
+                Sleep(350)
+                OnTextOverlay("JOINING `2" .. curworld .. "")
+                warp(curworld)
+            end)
+            return true
+        end
+        if (type == 2 and packet:find("/back")) then
+            RunThread(function()
+                warp(lastjoinedworld)
+                OnTextOverlay("BACK TO `2" .. lastjoinedworld .. "")
+            end)
+            return true
+        end
+        if (packet:find("action|join_request")) then
+            lastjoinedworld = GetLocal().world
+        end
+    end)
+    function block(varlist)
+        if dialog then
+            if varlist[0]:find("OnDialogRequest") and varlist[1]:find("Blue Gem Lock") or varlist[1]:find("Diamond Lock") or varlist[1]:find("The Black Gem Bank") then
+                return true
+            end
+        end
+        if varlist[0]:find("OnSDBroadcast") then
+            if blocksdb then
+                return true
+            end
+        end
+    end
+
+    AddCallback("block", "OnVarlist", block)
+    local dialogpacket = ""
+    function finishDialog()
+        local var = {} --make table
+        var[0] = "OnDialogRequest"
+        var[1] = dialogpacket
+        var.netid = -1 --need to put netid or it doesn't work
+        SendVarlist(var)
+        dialogpacket = ""
+    end
+
+    function textsc(text)
+        dialogpacket = dialogpacket .. "\ntext_scaling_string|" .. text .. "|"
+    end
+
+    function addEndDialog(name, accept)
+        dialogpacket = dialogpacket .. "end_dialog|" .. name .. "|" .. accept .. "|\n"
+    end
+
+    function addQuickExit()
+        dialogpacket = dialogpacket .. "add_quick_exit|\n"
+    end
+
+    function addSmallText(text)
+        dialogpacket = dialogpacket .. "add_smalltext|" .. text .. "|\n"
+    end
+
+    function addTextBox(text)
+        dialogpacket = dialogpacket .. "add_textbox|" .. text .. "|left|\n"
+    end
+
+    function addSpacer(type)
+        if type == "big" then
+            dialogpacket = dialogpacket .. "add_spacer|big|\n"
+        else
+            dialogpacket = dialogpacket .. "add_spacer|small|\n"
+        end
+    end
+
+    function addCheckbox(checkboxname, checkboxtext, checked)
+        if checked then
+            dialogpacket = dialogpacket .. "add_checkbox|" .. checkboxname .. "|" .. checkboxtext .. "|1|\n"
+        else
+            dialogpacket = dialogpacket .. "add_checkbox|" .. checkboxname .. "|" .. checkboxtext .. "|0|\n"
+        end
+    end
+
+    function addbuttonwhiticon(buttonname, textbutton, frame, itemid)
+        dialogpacket = dialogpacket ..
+            "\nadd_button_with_icon|" .. buttonname .. "|" .. textbutton .. "|" .. frame .. "|" .. itemid .. "||"
+    end
+
+    function endlist()
+        dialogpacket = dialogpacket .. "\nadd_button_with_icon||END_LIST|noflags|0|0|"
+    end
+
+    function addLabelWithIcon(text, tileid, type)
+        if type == "big" then
+            dialogpacket = dialogpacket .. "add_label_with_icon|big|" .. text .. "|left|" .. tileid .. "|\n"
+        else
+            dialogpacket = dialogpacket .. "add_label_with_icon|small|" .. text .. "|left|" .. tileid .. "|\n"
+        end
+    end
+
+    function proxy()
+        addLabelWithIcon("`9MEGP Proxy", "32", "small")
+        addSpacer("small")
+        addSmallText("Wellcome, " .. name .. " `0!")
+        addSmallText("User ID, `b" .. uid .. " `0!")
+        addTextBox("`9Script Made by: `2YourBae#2826")
+        addTextBox("`9Commant:")
+        addSmallText("`2/proxy `0(Check All Commant)")
+        addSmallText("`2/gems `0(For Check Amount Collecting Gems)")
+        addSmallText("`2/cd or /cdrop `0(For Drop Wls)")
+        addSmallText("`2/dd or /ddrop `0(For Drop Dls)")
+        addSmallText("`2/bd or /bdrop `0(For Drop Bgls)")
+        addSmallText("`2/setphone `0(For Set Phone Position)")
+        addSmallText("`2/cbgl `0(For Change Bgl)")
+        addSmallText("`2/bsdb `0(For block SDB)")
+        addSmallText("`2/bdialog `0(For block All Dialog-")
+        addSmallText("`0Use This if you can't Open `5BGL BANK`0 or etc)")
+        addSmallText("`2/wm `0(For Enable Fast Wrench)")
+        addSmallText("`2/wrench `0(For Choose Mode Wrench)")
+        addSmallText("`2/ping `0(For Show Ur Ping)")
+        addSmallText("`2/res `0(For Respowning)")
+        addSmallText("`2/relog `0(For Fast Relog)")
+        addSmallText("`2/back `0(For Join Previous World)")
+        addSmallText("`2/buydlall `0(For Auto Buy Dl With `4ALL UR GEMS`0)")
+        addSmallText("`2/buydl `0(For Buy Just 1 Dl)")
+        addSmallText("`2/dbgems `0(For Drop All Ur Bgems From Bank)")
+        addSmallText("`2/suck `0(For Suck All Ur Bgems)")
+        addSpacer("small")
+        addQuickExit()
+        addEndDialog("proxy", "`wOkay")
+        finishDialog()
+    end
+
+    function credit()
+        addLabelWithIcon("`9MEGP Proxy", "32", "small")
+        addSpacer("small")
+        addSmallText("`bPROXY RUNNING")
+        addSmallText("`9Script Made by: `2YourBae#2826")
+        addSmallText("Wellcome, " .. name .. " `0!")
+        addSmallText("User ID, `b" .. uid .. " `0!")
+        addSmallText("`6do `2/proxy `6For see feature!!!")
+        addSpacer("small")
+        addQuickExit()
+        addEndDialog("proxy", "`wOkay")
+        finishDialog()
+    end
+
+    credit()
